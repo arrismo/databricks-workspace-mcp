@@ -1,4 +1,4 @@
-# databricks-workspace-mcp
+# databricks-workspace-explorer
 
 This repo now includes a VS Code extension to browse Databricks Workspace files in the Explorer side panel.
 
