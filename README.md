@@ -38,9 +38,9 @@ Run the MCP server:
 databricks-workspace-mcp
 ```
 
-## VS Code Claude Code config
+## MCP client config (Claude Code, Codex, Zed)
 
-Create `.vscode/mcp.json`:
+You can use one canonical server setup across MCP clients:
 
 ```json
 {
@@ -57,5 +57,7 @@ Create `.vscode/mcp.json`:
 }
 ```
 
-A ready-to-edit version is included at `.vscode/mcp.json`.
+Use this same configuration in Claude Code, Codex, or Zed (only the config file location/format wrapper may differ by client).
+
+For VS Code Claude Code, a ready-to-edit version is included at `.vscode/mcp.json`.
 
