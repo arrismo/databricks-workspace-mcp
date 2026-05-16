@@ -1,0 +1,12 @@
+{
+  "servers": {
+    "databricks-workspace": {
+      "command": "databricks-workspace-mcp",
+      "args": [],
+      "env": {
+        "DATABRICKS_HOST": "https://<your-workspace-host>",
+        "DATABRICKS_TOKEN": "<your-personal-access-token>"
+      }
+    }
+  }
+}
