@@ -33,9 +33,12 @@ export DATABRICKS_HOST="https://dbc-2e2849bb-fd64.cloud.databricks.com"
 cd vscode-extension
 npm install
 npm run compile
+npm test
 ```
 
 Then press `F5` in VS Code (Extension Development Host).
+
+A debug config is included at `vscode-extension/.vscode/launch.json` (configuration name: `Run Extension`).
 
 ## Open Databricks in Explorer
 

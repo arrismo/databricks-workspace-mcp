@@ -1,6 +1,5 @@
 import * as vscode from "vscode";
-
-type WorkspaceObjectType = "DIRECTORY" | "NOTEBOOK" | "FILE" | string;
+import { decodeBase64Content, toDbPath, toFileType, type WorkspaceObjectType } from "./workspaceUtils";
 
 type WorkspaceObject = {
   path: string;
@@ -24,7 +23,7 @@ class DatabricksWorkspaceFS implements vscode.FileSystemProvider {
   }
 
   async stat(uri: vscode.Uri): Promise<vscode.FileStat> {
-    const dbPath = this.toDbPath(uri);
+    const dbPath = toDbPath(uri.path);
     if (dbPath === "/") {
       return { type: vscode.FileType.Directory, ctime: 0, mtime: 0, size: 0 };
     }
@@ -34,7 +33,7 @@ class DatabricksWorkspaceFS implements vscode.FileSystemProvider {
   }
 
   async readDirectory(uri: vscode.Uri): Promise<[string, vscode.FileType][]> {
-    const dbPath = this.toDbPath(uri);
+    const dbPath = toDbPath(uri.path);
     const data = await this.api<{ objects?: WorkspaceObject[] }>(
       `/api/2.0/workspace/list?path=${encodeURIComponent(dbPath)}`
     );
@@ -42,12 +41,12 @@ class DatabricksWorkspaceFS implements vscode.FileSystemProvider {
 
     return objects.map((o) => {
       const name = o.path.split("/").filter(Boolean).pop() ?? o.path;
-      return [name, this.toFileType(o.object_type)] as [string, vscode.FileType];
+      return [name, this.toVsFileType(o.object_type)] as [string, vscode.FileType];
     });
   }
 
   async readFile(uri: vscode.Uri): Promise<Uint8Array> {
-    const dbPath = this.toDbPath(uri);
+    const dbPath = toDbPath(uri.path);
     const status = await this.getStatus(dbPath);
 
     if (status.object_type === "DIRECTORY") {
@@ -59,9 +58,7 @@ class DatabricksWorkspaceFS implements vscode.FileSystemProvider {
       `/api/2.0/workspace/export?path=${encodeURIComponent(dbPath)}&format=${format}`
     );
 
-    const content = exported.content ?? "";
-    const decoded = Buffer.from(content, "base64");
-    return new Uint8Array(decoded);
+    return decodeBase64Content(exported.content);
   }
 
   createDirectory(): void {
@@ -80,25 +77,17 @@ class DatabricksWorkspaceFS implements vscode.FileSystemProvider {
     throw vscode.FileSystemError.NoPermissions("Read-only provider");
   }
 
-  private toDbPath(uri: vscode.Uri): string {
-    const p = uri.path || "/";
-    return p.startsWith("/") ? p : `/${p}`;
-  }
-
   private toFileStat(o: WorkspaceObject): vscode.FileStat {
     return {
-      type: this.toFileType(o.object_type),
+      type: this.toVsFileType(o.object_type),
       ctime: o.created_at ?? 0,
       mtime: o.modified_at ?? 0,
       size: o.size ?? 0,
     };
   }
 
-  private toFileType(objectType: WorkspaceObjectType): vscode.FileType {
-    if (objectType === "DIRECTORY") {
-      return vscode.FileType.Directory;
-    }
-    return vscode.FileType.File;
+  private toVsFileType(objectType: WorkspaceObjectType): vscode.FileType {
+    return toFileType(objectType) === "directory" ? vscode.FileType.Directory : vscode.FileType.File;
   }
 
   private async getStatus(path: string): Promise<WorkspaceObject> {
@@ -145,7 +134,7 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.commands.registerCommand("databricksWorkspace.openRoot", async () => {
       const uri = vscode.Uri.parse("dbws:/");
-      await vscode.commands.executeCommand("vscode.openFolder", uri, true);
+      await vscode.commands.executeCommand("vscode.openFolder", uri, false);
     })
   );
 }
