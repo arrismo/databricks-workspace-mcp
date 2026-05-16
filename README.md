@@ -24,7 +24,7 @@ Set either extension settings or env vars:
 Example host:
 
 ```bash
-export DATABRICKS_HOST="https://dbc-2e2849bb-fd64.cloud.databricks.com"
+export DATABRICKS_HOST="https://<your-workspace>.cloud.databricks.com"
 ```
 
 ## Run the extension locally
