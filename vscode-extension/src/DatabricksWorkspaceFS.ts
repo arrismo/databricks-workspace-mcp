@@ -228,7 +228,8 @@ export class DatabricksWorkspaceFS implements vscode.FileSystemProvider {
     if (!this._client) {
       const config = vscode.workspace.getConfiguration("databricksWorkspace");
       const host = config.get<string>("host") || undefined;
-      const profile = config.get<string>("profile") || undefined;
+      const configuredProfile = (config.get<string>("profile") || "").trim();
+      const profile = configuredProfile.length > 0 ? configuredProfile : undefined;
       const databricksCliPath =
         config.get<string>("databricksCliPath") || undefined;
 

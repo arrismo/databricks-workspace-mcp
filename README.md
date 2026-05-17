@@ -1,6 +1,6 @@
 # databricks-workspace-explorer
 
-This repo now includes a VS Code extension to browse Databricks Workspace files in the Explorer side panel.
+A VS Code extension that mounts your Databricks Workspace as `dbws:/` so you can browse and edit workspace files from the Explorer.
 
 ## VS Code extension location
 

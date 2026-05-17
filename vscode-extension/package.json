@@ -32,8 +32,8 @@
         },
         "databricksWorkspace.profile": {
           "type": "string",
-          "default": "DEFAULT",
-          "description": "Databricks config profile name from ~/.databrickscfg"
+          "default": "",
+          "description": "Databricks config profile name from ~/.databrickscfg (leave empty to use Databricks CLI default profile)"
         },
         "databricksWorkspace.databricksCliPath": {
           "type": "string",
@@ -58,8 +58,5 @@
     "@types/vscode": "^1.88.0",
     "tsx": "^4.19.2",
     "typescript": "^5.5.4"
-  },
-  "dependencies": {
-    "@databricks/sdk-experimental": "^0.14.2"
   }
 }

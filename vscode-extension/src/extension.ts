@@ -17,9 +17,10 @@ export function activate(context: vscode.ExtensionContext): void {
     || "<not set>";
   log(`Host: ${host}`);
 
-  const profile = vscode.workspace.getConfiguration("databricksWorkspace").get<string>("profile")
+  const configuredProfile = (vscode.workspace.getConfiguration("databricksWorkspace").get<string>("profile") || "").trim();
+  const profile = configuredProfile
     || process.env.DATABRICKS_CONFIG_PROFILE
-    || "DEFAULT (default)";
+    || "<cli default profile>";
   log(`Profile: ${profile}`);
 
   const provider = new DatabricksWorkspaceFS();
