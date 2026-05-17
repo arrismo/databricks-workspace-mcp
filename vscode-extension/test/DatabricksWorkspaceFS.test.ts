@@ -2,7 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { Buffer } from "node:buffer";
 import * as vscode from "vscode";
-import { DatabricksWorkspaceFS } from "../src/DatabricksWorkspaceFS";
+import {
+  DatabricksWorkspaceFS,
+  resolveWorkspaceClientConfig,
+} from "../src/DatabricksWorkspaceFS";
 
 // ---------------------------------------------------------------------------
 // Helpers for building fake SDK objects
@@ -205,6 +208,24 @@ test("readFile reads notebook source", async () => {
   assert.equal(Buffer.from(content).toString("utf8"), "print(1)");
 });
 
+test("readFile exports .ipynb notebooks with JUPYTER format", async () => {
+  let exportReq: any;
+  const client = fakeClient({
+    getStatus: async () => notebookInfo(),
+    export: async (req: any) => {
+      exportReq = req;
+      return { content: base64Encode('{"cells":[]}') };
+    },
+  });
+  const fs = new DatabricksWorkspaceFS(() => client);
+
+  const content = await fs.readFile(makeUri("/Users/test/notebook.ipynb"));
+
+  assert.equal(exportReq.path, "/Users/test/notebook");
+  assert.equal(exportReq.format, "JUPYTER");
+  assert.equal(Buffer.from(content).toString("utf8"), '{"cells":[]}');
+});
+
 test("readFile throws FileIsADirectory for directories", async () => {
   const client = fakeClient({
     getStatus: async () => dirInfo(),
@@ -301,7 +322,33 @@ test("writeFile uses JUPYTER format for .ipynb files", async () => {
     overwrite: true,
   });
 
+  assert.equal(importReq.path, "/Users/test/notebook");
   assert.equal(importReq.format, "JUPYTER");
+});
+
+test("writeFile creates a new file when create=true", async () => {
+  let importReq: any;
+  const client = fakeClient({
+    getStatus: async (req: any) => {
+      if (req.path === "/Users/test/new.py") {
+        throw new Error("Not found");
+      }
+      return fileInfo({ path: req.path });
+    },
+    import: async (req: any) => {
+      importReq = req;
+    },
+  });
+  const fs = new DatabricksWorkspaceFS(() => client);
+
+  await fs.writeFile(makeUri("/Users/test/new.py"), Buffer.from("print('new')"), {
+    create: true,
+    overwrite: false,
+  });
+
+  assert.equal(importReq.path, "/Users/test/new.py");
+  assert.equal(importReq.format, "SOURCE");
+  assert.equal(Buffer.from(importReq.content, "base64").toString("utf8"), "print('new')");
 });
 
 test("writeFile throws FileNotFound when create=false and file doesn't exist", async () => {
@@ -447,6 +494,94 @@ test("rename throws FileExists when overwrite=false and target exists", async ()
   );
 });
 
+test("rename allows overwrite when target exists", async () => {
+  let importReq: any;
+  let deleteReq: any;
+  const client = fakeClient({
+    getStatus: async (req: any) => {
+      if (req.path === "/Users/test/old.py") return fileInfo({ path: req.path });
+      if (req.path === "/Users/test/existing.py") return fileInfo({ path: req.path });
+      throw new Error("Not found");
+    },
+    export: async () => ({ content: base64Encode("replacement") }),
+    import: async (req: any) => {
+      importReq = req;
+    },
+    delete: async (req: any) => {
+      deleteReq = req;
+    },
+  });
+  const fs = new DatabricksWorkspaceFS(() => client);
+
+  await fs.rename(makeUri("/Users/test/old.py"), makeUri("/Users/test/existing.py"), { overwrite: true });
+
+  assert.equal(importReq.path, "/Users/test/existing.py");
+  assert.equal(Buffer.from(importReq.content, "base64").toString("utf8"), "replacement");
+  assert.equal(deleteReq.path, "/Users/test/old.py");
+});
+
+test("rename wraps delete-after-copy errors in Unavailable", async () => {
+  const client = fakeClient({
+    getStatus: async (req: any) => {
+      if (req.path === "/Users/test/old.py") return fileInfo({ path: req.path });
+      throw new Error("Not found");
+    },
+    export: async () => ({ content: base64Encode("old content") }),
+    import: async () => {},
+    delete: async () => {
+      throw new Error("Delete failed");
+    },
+  });
+  const fs = new DatabricksWorkspaceFS(() => client);
+
+  await assert.rejects(
+    () => fs.rename(makeUri("/Users/test/old.py"), makeUri("/Users/test/new.py"), { overwrite: false }),
+    (err: any) => err.code === "Unavailable" && err.message.includes("after rename")
+  );
+});
+
+// ---------------------------------------------------------------------------
+// Tests: auth/config fallback behavior
+// ---------------------------------------------------------------------------
+
+test("resolveWorkspaceClientConfig trims profile and omits empty values", () => {
+  const config = {
+    get<T>(section: string): T | undefined {
+      const values: Record<string, any> = {
+        host: "",
+        profile: "   ",
+        databricksCliPath: "",
+      };
+      return values[section];
+    },
+  };
+
+  assert.deepEqual(resolveWorkspaceClientConfig(config), {
+    host: undefined,
+    profile: undefined,
+    databricksCliPath: undefined,
+  });
+});
+
+test("resolveWorkspaceClientConfig preserves host, cli path, and trimmed profile", () => {
+  const config = {
+    get<T>(section: string): T | undefined {
+      const values: Record<string, any> = {
+        host: "https://dbc.example.com",
+        profile: "  DEFAULT  ",
+        databricksCliPath: "/usr/local/bin/databricks",
+      };
+      return values[section];
+    },
+  };
+
+  assert.deepEqual(resolveWorkspaceClientConfig(config), {
+    host: "https://dbc.example.com",
+    profile: "DEFAULT",
+    databricksCliPath: "/usr/local/bin/databricks",
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Tests: watch
 // ---------------------------------------------------------------------------
@@ -477,32 +612,63 @@ test("onDidChangeFile fires on writeFile", async () => {
   assert.equal(fired, true);
 });
 
-test("onDidChangeFile fires on createDirectory", async () => {
+test("onDidChangeFile fires Created event on createDirectory", async () => {
   const client = fakeClient({
     mkdirs: async () => {},
   });
   const fs = new DatabricksWorkspaceFS(() => client);
 
-  let fired = false;
-  fs.onDidChangeFile((_events) => {
-    fired = true;
+  let events: any[] | undefined;
+  fs.onDidChangeFile((firedEvents) => {
+    events = firedEvents;
   });
 
-  await fs.createDirectory(makeUri("/Users/test/newdir"));
-  assert.equal(fired, true);
+  const uri = makeUri("/Users/test/newdir");
+  await fs.createDirectory(uri);
+
+  assert.deepEqual(events, [{ type: vscode.FileChangeType.Created, uri }]);
 });
 
-test("onDidChangeFile fires on delete", async () => {
+test("onDidChangeFile fires Deleted event on delete", async () => {
   const client = fakeClient({
     delete: async () => {},
   });
   const fs = new DatabricksWorkspaceFS(() => client);
 
-  let fired = false;
-  fs.onDidChangeFile((_events) => {
-    fired = true;
+  let events: any[] | undefined;
+  fs.onDidChangeFile((firedEvents) => {
+    events = firedEvents;
   });
 
-  await fs.delete(makeUri("/Users/test/file.py"), { recursive: false });
-  assert.equal(fired, true);
+  const uri = makeUri("/Users/test/file.py");
+  await fs.delete(uri, { recursive: false });
+
+  assert.deepEqual(events, [{ type: vscode.FileChangeType.Deleted, uri }]);
+});
+
+test("onDidChangeFile fires Deleted and Created events on rename", async () => {
+  const client = fakeClient({
+    getStatus: async (req: any) => {
+      if (req.path === "/Users/test/old.py") return fileInfo({ path: req.path });
+      throw new Error("Not found");
+    },
+    export: async () => ({ content: base64Encode("renamed") }),
+    import: async () => {},
+    delete: async () => {},
+  });
+  const fs = new DatabricksWorkspaceFS(() => client);
+
+  let events: any[] | undefined;
+  fs.onDidChangeFile((firedEvents) => {
+    events = firedEvents;
+  });
+
+  const oldUri = makeUri("/Users/test/old.py");
+  const newUri = makeUri("/Users/test/new.py");
+  await fs.rename(oldUri, newUri, { overwrite: false });
+
+  assert.deepEqual(events, [
+    { type: vscode.FileChangeType.Deleted, uri: oldUri },
+    { type: vscode.FileChangeType.Created, uri: newUri },
+  ]);
 });

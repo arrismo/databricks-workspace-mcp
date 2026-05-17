@@ -12,6 +12,32 @@ import {
 
 export type WorkspaceClientFactory = () => WorkspaceClient | Promise<WorkspaceClient>;
 
+export interface WorkspaceClientConfigSource {
+  get<T>(section: string): T | undefined;
+}
+
+export interface ResolvedWorkspaceClientConfig {
+  host?: string;
+  profile?: string;
+  databricksCliPath?: string;
+}
+
+export function resolveWorkspaceClientConfig(
+  config: WorkspaceClientConfigSource
+): ResolvedWorkspaceClientConfig {
+  const host = config.get<string>("host") || undefined;
+  const configuredProfile = (config.get<string>("profile") || "").trim();
+  const profile = configuredProfile.length > 0 ? configuredProfile : undefined;
+  const databricksCliPath =
+    config.get<string>("databricksCliPath") || undefined;
+
+  return {
+    host,
+    profile,
+    databricksCliPath,
+  };
+}
+
 export class DatabricksWorkspaceFS implements vscode.FileSystemProvider {
   private readonly emitter = new vscode.EventEmitter<vscode.FileChangeEvent[]>();
   readonly onDidChangeFile = this.emitter.event;
@@ -227,17 +253,7 @@ export class DatabricksWorkspaceFS implements vscode.FileSystemProvider {
 
     if (!this._client) {
       const config = vscode.workspace.getConfiguration("databricksWorkspace");
-      const host = config.get<string>("host") || undefined;
-      const configuredProfile = (config.get<string>("profile") || "").trim();
-      const profile = configuredProfile.length > 0 ? configuredProfile : undefined;
-      const databricksCliPath =
-        config.get<string>("databricksCliPath") || undefined;
-
-      this._client = new WorkspaceClient({
-        host,
-        profile,
-        databricksCliPath,
-      });
+      this._client = new WorkspaceClient(resolveWorkspaceClientConfig(config));
     }
     return this._client;
   }
