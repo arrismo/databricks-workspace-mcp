@@ -61,6 +61,15 @@ In the Extension Development Host:
 2. VS Code opens `dbws:/` as a folder
 3. Browse files/folders in the Explorer panel
 
+## Commands
+
+Available from the Command Palette:
+
+- `Databricks: Open Workspace Explorer` — opens the `dbws:/` workspace root in Explorer.
+- `Databricks: Open Workspace Path` — opens a specific Databricks workspace file or folder by path.
+- `Databricks: Refresh Workspace` — refreshes the Databricks workspace view.
+- `Databricks: Show Active Auth/Profile` — shows the active host, profile, and optional Databricks CLI path.
+
 ## Notes
 
 - Supports create/write/delete for workspace files and notebooks.
