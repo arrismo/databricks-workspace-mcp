@@ -1,7 +1,10 @@
 node_modules/**
 src/**
-.vscode/**
 test/**
+.vscode/**
+.github/**
+.venv/**
+.pytest_cache/**
 *.ts
 *.map
 tsconfig.json

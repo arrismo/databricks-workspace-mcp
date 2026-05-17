@@ -3,7 +3,17 @@
   "displayName": "Databricks Workspace Explorer",
   "description": "Browse Databricks workspace files in VS Code Explorer",
   "version": "0.0.1",
-  "publisher": "local",
+  "publisher": "mikaelmoise",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/arrismo/databricks-workspace-explorer.git"
+  },
+  "homepage": "https://github.com/arrismo/databricks-workspace-explorer",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/arrismo/databricks-workspace-explorer/issues"
+  },
+  "icon": "images/dwe_logo.png",
   "engines": {
     "vscode": "^1.88.0"
   },

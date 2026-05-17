@@ -1,5 +1,7 @@
 # databricks-workspace-explorer
 
+> Disclaimer: This project is not affiliated with, endorsed by, or maintained by Databricks.
+
 A VS Code extension that mounts your Databricks Workspace as `dbws:/` so you can browse and edit workspace files from the Explorer.
 
 ## What it does
