@@ -30,3 +30,6 @@ vscode-extension/out/
 # IDE / OS
 .DS_Store
 .vscode/*.log
+
+# Local launch config (contains tokens)
+vscode-extension/.vscode/launch.json
